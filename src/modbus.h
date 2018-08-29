@@ -323,6 +323,7 @@ MODBUS_API void modbus_set_float_cdab(float f, uint16_t *dest);
 
 #include "modbus-rtu.h"
 #include "modbus-tcp.h"
+#include "modbus-rtutcp.h"
 
 MODBUS_END_DECLS
 

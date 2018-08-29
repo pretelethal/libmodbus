@@ -18,7 +18,9 @@ const int EXCEPTION_RC = 2;
 enum {
     TCP,
     TCP_PI,
-    RTU
+    RTU,
+    RTUTCP,
+    RTUTCP_PI
 };
 
 int test_server(modbus_t *ctx, int use_backend);
@@ -87,10 +89,12 @@ int main(int argc, char *argv[])
             use_backend = TCP_PI;
         } else if (strcmp(argv[1], "rtu") == 0) {
             use_backend = RTU;
+        } else if (strcmp(argv[1], "rtutcp") == 0) {
+            use_backend = RTUTCP;
+        } else if (strcmp(argv[1], "rtutcppi") == 0) {
+            use_backend = RTUTCP_PI;
         } else {
-            printf("Modbus client for unit testing\n");
-            printf("Usage:\n  %s [tcp|tcppi|rtu]\n", argv[0]);
-            printf("Eg. tcp 127.0.0.1 or rtu /dev/ttyUSB1\n\n");
+            printf("Usage:\n  %s [tcp|tcppi|rtu|rtutcp|rtutcppi] - Modbus client for unit testing\n\n", argv[0]);
             exit(1);
         }
     } else {
@@ -120,8 +124,14 @@ int main(int argc, char *argv[])
         ctx = modbus_new_tcp(ip_or_device, 1502);
     } else if (use_backend == TCP_PI) {
         ctx = modbus_new_tcp_pi(ip_or_device, "1502");
+    } else if (use_backend == RTU) {
+        ctx = modbus_new_rtu("/dev/ttyUSB1", 115200, 'N', 8, 1);
+    } else if (use_backend == RTUTCP) {
+        ctx = modbus_new_rtutcp("127.0.0.1", 1502);
+    } else if (use_backend == RTUTCP_PI) {
+        ctx = modbus_new_rtutcp_pi("::1", "1502");
     } else {
-        ctx = modbus_new_rtu(ip_or_device, 115200, 'N', 8, 1);
+      return -1;
     }
     if (ctx == NULL) {
         fprintf(stderr, "Unable to allocate libmodbus context\n");
@@ -132,7 +142,7 @@ int main(int argc, char *argv[])
     modbus_set_error_recovery(
         ctx, MODBUS_ERROR_RECOVERY_LINK | MODBUS_ERROR_RECOVERY_PROTOCOL);
 
-    if (use_backend == RTU) {
+    if (use_backend == RTU || use_backend == RTUTCP || use_backend == RTUTCP_PI) {
         modbus_set_slave(ctx, SERVER_ID);
     }
 
@@ -549,6 +559,18 @@ int main(int argc, char *argv[])
             ctx, UT_REGISTERS_ADDRESS, UT_REGISTERS_NB, tab_rp_registers);
         printf("2/3 No reply after a broadcast query: ");
         ASSERT_TRUE(rc == -1 && errno == ETIMEDOUT, "");
+    } else if (use_backend == RTUTCP || use_backend == RTUTCP_PI) {
+        /* No response in RTU over TCP mode */
+        printf("1/3 No response from slave %d: ", INVALID_SERVER_ID);
+        ASSERT_TRUE(rc == -1 && errno == ETIMEDOUT, "");
+
+        rc = modbus_set_slave(ctx, MODBUS_BROADCAST_ADDRESS);
+        ASSERT_TRUE(rc != -1, "Invalid broadcast address");
+
+        rc = modbus_read_registers(ctx, UT_REGISTERS_ADDRESS,
+                                   UT_REGISTERS_NB, tab_rp_registers);
+        printf("2/3 No reply after a broadcast query: ");
+        ASSERT_TRUE(rc == -1 && errno == ETIMEDOUT, "");
     } else {
         /* Response in TCP mode */
         printf("1/3 Response from slave %d: ", INVALID_SERVER_ID);
@@ -751,7 +773,7 @@ int test_server(modbus_t *ctx, int use_backend)
     int i;
     /* Read requests */
     const int READ_RAW_REQ_LEN = 6;
-    const int slave = (use_backend == RTU) ? SERVER_ID : MODBUS_TCP_SLAVE;
+    const int slave = (use_backend == RTU || use_backend == RTUTCP || use_backend == RTUTCP_PI) ? SERVER_ID : MODBUS_TCP_SLAVE;
     uint8_t read_raw_req[] = {slave,
                               /* function, address, 5 values */
                               MODBUS_FC_READ_HOLDING_REGISTERS,
@@ -814,7 +836,7 @@ int test_server(modbus_t *ctx, int use_backend)
     int backend_length;
     int backend_offset;
 
-    if (use_backend == RTU) {
+    if (use_backend == RTU || use_backend == RTUTCP || use_backend == RTUTCP_PI) {
         backend_length = 3;
         backend_offset = 1;
     } else {

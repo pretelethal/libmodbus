@@ -1127,14 +1127,9 @@ int modbus_reply(modbus_t *ctx,
         break;
     }
 
-    /* Suppress any responses in RTU when the request was a broadcast, excepted when quirk
-     * is enabled. */
-    if (ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTU &&
-        slave == MODBUS_BROADCAST_ADDRESS &&
-        !(ctx->quirks & MODBUS_QUIRK_REPLY_TO_BROADCAST)) {
-        return 0;
-    }
-    return send_msg(ctx, rsp, rsp_length);
+    /* Suppress any responses when the request was a broadcast */
+    return ((ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTU || ctx->backend->backend_type == _MODBUS_BACKEND_TYPE_RTUTCP) &&
+            slave == MODBUS_BROADCAST_ADDRESS) ? 0 : send_msg(ctx, rsp, rsp_length);
 }
 
 int modbus_reply_exception(modbus_t *ctx, const uint8_t *req, unsigned int exception_code)
