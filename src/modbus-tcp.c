@@ -447,7 +447,7 @@ int _modbus_tcp_pi_connect(modbus_t *ctx)
     return 0;
 }
 
-static unsigned int _modbus_tcp_is_connected(modbus_t *ctx)
+unsigned int _modbus_tcp_is_connected(modbus_t *ctx)
 {
     return ctx->s >= 0;
 }

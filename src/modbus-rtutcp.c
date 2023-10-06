@@ -44,7 +44,23 @@
 static int _modbus_set_slave(modbus_t *ctx, int slave)
 {
     /* Broadcast address is 0 (MODBUS_BROADCAST_ADDRESS) */
-    if (slave >= 0 && slave <= 247) {
+    /*if (slave >= 0 && slave <= 247) {
+        ctx->slave = slave;
+    } else {
+        errno = EINVAL;
+        return -1;
+    }
+
+    return 0;*/
+
+    int max_slave = (ctx->quirks & MODBUS_QUIRK_MAX_SLAVE) ? 255 : 247;
+
+    /* Broadcast address is 0 (MODBUS_BROADCAST_ADDRESS) */
+    if (slave >= 0 && slave <= max_slave) {
+        ctx->slave = slave;
+    } else if (slave == MODBUS_TCP_SLAVE) {
+        /* The special value MODBUS_TCP_SLAVE (0xFF) can be used in TCP mode to
+         * restore the default value. */
         ctx->slave = slave;
     } else {
         errno = EINVAL;
@@ -107,6 +123,11 @@ static int _modbus_rtutcp_connect(modbus_t *ctx)
 static int _modbus_rtutcp_pi_connect(modbus_t *ctx)
 {
     return _modbus_tcp_pi_connect(ctx);
+}
+
+static int _modbus_rtutcp_is_connected(modbus_t *ctx)
+{
+    return _modbus_tcp_is_connected(ctx);
 }
 
 static void _modbus_rtutcp_close(modbus_t *ctx)
@@ -200,6 +221,7 @@ const modbus_backend_t _modbus_rtutcp_backend = {
     _modbus_rtutcp_check_integrity,
     NULL,
     _modbus_rtutcp_connect,
+    _modbus_rtutcp_is_connected,
     _modbus_rtutcp_close,
     _modbus_rtutcp_flush,
     _modbus_rtutcp_select,
@@ -222,6 +244,7 @@ const modbus_backend_t _modbus_rtutcp_pi_backend = {
     _modbus_rtutcp_check_integrity,
     NULL,
     _modbus_rtutcp_pi_connect,
+    _modbus_rtutcp_is_connected,
     _modbus_rtutcp_close,
     _modbus_rtutcp_flush,
     _modbus_rtutcp_select,
@@ -253,6 +276,9 @@ modbus_t* modbus_new_rtutcp(const char *ip, int port)
         return NULL;
     }
     _modbus_init_common(ctx);
+
+    /* Could be changed after to reach a remote serial Modbus device */
+    ctx->slave = MODBUS_TCP_SLAVE;
 
     ctx->backend = &_modbus_rtutcp_backend;
 
@@ -292,16 +318,18 @@ modbus_t* modbus_new_rtutcp(const char *ip, int port)
 
 modbus_t* modbus_new_rtutcp_pi(const char *node, const char *service)
 {
+
     modbus_t *ctx;
     modbus_tcp_pi_t *ctx_tcp_pi;
-    size_t dest_size;
-    size_t ret_size;
 
-    ctx = (modbus_t *)malloc(sizeof(modbus_t));
+    ctx = (modbus_t *) malloc(sizeof(modbus_t));
     if (ctx == NULL) {
         return NULL;
     }
     _modbus_init_common(ctx);
+
+    /* Could be changed after to reach a remote serial Modbus device */
+    ctx->slave = MODBUS_TCP_SLAVE;
 
     ctx->backend = &_modbus_rtutcp_pi_backend;
 
@@ -311,48 +339,33 @@ modbus_t* modbus_new_rtutcp_pi(const char *node, const char *service)
         errno = ENOMEM;
         return NULL;
     }
-    ctx_tcp_pi = (modbus_tcp_pi_t *)ctx->backend_data;
+    ctx_tcp_pi = (modbus_tcp_pi_t *) ctx->backend_data;
+    ctx_tcp_pi->node = NULL;
+    ctx_tcp_pi->service = NULL;
 
-    if (node == NULL) {
+    if (node != NULL) {
+        ctx_tcp_pi->node = strdup(node);
+    } else {
         /* The node argument can be empty to indicate any hosts */
-        ctx_tcp_pi->node[0] = 0;
-    } else {
-        dest_size = sizeof(char) * _MODBUS_TCP_PI_NODE_LENGTH;
-        ret_size = strlcpy(ctx_tcp_pi->node, node, dest_size);
-        if (ret_size == 0) {
-            fprintf(stderr, "The node string is empty\n");
-            modbus_free(ctx);
-            errno = EINVAL;
-            return NULL;
-        }
-
-        if (ret_size >= dest_size) {
-            fprintf(stderr, "The node string has been truncated\n");
-            modbus_free(ctx);
-            errno = EINVAL;
-            return NULL;
-        }
+        ctx_tcp_pi->node = strdup("");
     }
 
-    if (service != NULL) {
-        dest_size = sizeof(char) * _MODBUS_TCP_PI_SERVICE_LENGTH;
-        ret_size = strlcpy(ctx_tcp_pi->service, service, dest_size);
-    } else {
-        /* Empty service is not allowed, error catched below. */
-        ret_size = 0;
-    }
-
-    if (ret_size == 0) {
-        fprintf(stderr, "The service string is empty\n");
+    if (ctx_tcp_pi->node == NULL) {
         modbus_free(ctx);
-        errno = EINVAL;
+        errno = ENOMEM;
         return NULL;
     }
 
-    if (ret_size >= dest_size) {
-        fprintf(stderr, "The service string has been truncated\n");
+    if (service != NULL && service[0] != '\0') {
+        ctx_tcp_pi->service = strdup(service);
+    } else {
+        /* Default Modbus port number */
+        ctx_tcp_pi->service = strdup("502");
+    }
+
+    if (ctx_tcp_pi->service == NULL) {
         modbus_free(ctx);
-        errno = EINVAL;
+        errno = ENOMEM;
         return NULL;
     }
 
