@@ -14,12 +14,13 @@
 m4_define([libmodbus_version_major], [3])
 m4_define([libmodbus_version_minor], [1])
 m4_define([libmodbus_version_micro], [10])
+m4_define([libmodbus_version_custom], [1])
 
 m4_define([libmodbus_release_status],
     [m4_if(m4_eval(libmodbus_version_minor % 2), [1], [snapshot], [release])])
 
 m4_define([libmodbus_version],
-    [libmodbus_version_major.libmodbus_version_minor.libmodbus_version_micro])
+    [libmodbus_version_major.libmodbus_version_minor.libmodbus_version_micro.libmodbus_version_custom])
 
 AC_PREREQ([2.63])
 AC_INIT([libmodbus],
@@ -39,10 +40,12 @@ AM_SILENT_RULES([yes])
 LIBMODBUS_VERSION_MAJOR=libmodbus_version_major
 LIBMODBUS_VERSION_MINOR=libmodbus_version_minor
 LIBMODBUS_VERSION_MICRO=libmodbus_version_micro
+LIBMODBUS_VERSION_CUSTOM=libmodbus_version_custom
 LIBMODBUS_VERSION=libmodbus_version
 AC_SUBST(LIBMODBUS_VERSION_MAJOR)
 AC_SUBST(LIBMODBUS_VERSION_MINOR)
 AC_SUBST(LIBMODBUS_VERSION_MICRO)
+AC_SUBST(LIBMODBUS_VERSION_CUSTOM)
 AC_SUBST(LIBMODBUS_VERSION)
 
 # ABI version
