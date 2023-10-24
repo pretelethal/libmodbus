@@ -200,8 +200,22 @@ static int _modbus_rtutcp_select(modbus_t *ctx, fd_set *rfds, struct timeval *tv
     return _modbus_tcp_select(ctx, rfds, tv, length_to_read);
 }
 
-static void _modbus_rtutcp_free(modbus_t *ctx) {
-    free(ctx->backend_data);
+static void _modbus_rtutcp_free(modbus_t *ctx)
+{
+    if (ctx->backend_data) {
+        free(ctx->backend_data);
+    }
+    free(ctx);
+}
+
+static void _modbus_rtutcp_pi_free(modbus_t *ctx)
+{
+    if (ctx->backend_data) {
+        modbus_tcp_pi_t *ctx_rtutcp_pi = ctx->backend_data;
+        free(ctx_rtutcp_pi->node);
+        free(ctx_rtutcp_pi->service);
+        free(ctx->backend_data);
+    }
     free(ctx);
 }
 
@@ -248,7 +262,7 @@ const modbus_backend_t _modbus_rtutcp_pi_backend = {
     _modbus_rtutcp_close,
     _modbus_rtutcp_flush,
     _modbus_rtutcp_select,
-    _modbus_rtutcp_free
+    _modbus_rtutcp_pi_free
 };
 
 modbus_t* modbus_new_rtutcp(const char *ip, int port)
