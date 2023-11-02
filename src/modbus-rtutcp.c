@@ -43,16 +43,6 @@
 
 static int _modbus_set_slave(modbus_t *ctx, int slave)
 {
-    /* Broadcast address is 0 (MODBUS_BROADCAST_ADDRESS) */
-    /*if (slave >= 0 && slave <= 247) {
-        ctx->slave = slave;
-    } else {
-        errno = EINVAL;
-        return -1;
-    }
-
-    return 0;*/
-
     int max_slave = (ctx->quirks & MODBUS_QUIRK_MAX_SLAVE) ? 255 : 247;
 
     /* Broadcast address is 0 (MODBUS_BROADCAST_ADDRESS) */
